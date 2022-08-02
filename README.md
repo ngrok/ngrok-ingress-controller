@@ -11,14 +11,16 @@ TOOD:
   * It should first look for an existing config map with the unique and well known name `ngrok-ingress-controller-edge-prefix`. If it already exists, read it and proceed. Otherwise, attempt to make it. If it errors because it exists already (another controller may have just made it) swallow that error. Wait a tiny amount and then read the config map value. Use that as namespace for things in the ngrok account. Just do this in the main.go to start. All controller instances will run it, but being idempotent that should be fine where 1 works and the rest fail
   * TODO: Is a 6 digit hash good enough? Or should we make some human readable word like heroku?
   * TODO: would prefixing resources with this look/work right in the dashboard?
+  * for now, this could be a variable we hardcode. Then we can pass it via helm. We can defer auto creating it for a while
 * maybe auto install helm
 * ci to run make commands and then diff at end to make sure anything generated and checked in is all good
-* perhaps use https://book.kubebuilder.io/component-config-tutorial/tutorial.html instead of a normal config map for agent configs
+* perhaps use https://book.kubebuilder.io/component-config-tutorial/tutorial.html instead of a normal config map for agent configs (only applicable when we move the agent runtime into the main container)
 * use finalizers to handle deleting resources https://book.kubebuilder.io/reference/using-finalizers.html
 * add ingress class
 * create pr template
 * helm lint
 * setup filters https://stuartleeks.com/posts/kubebuilder-event-filters-part-1-delete/
+* plumb ctx
 
 ## Setup
 

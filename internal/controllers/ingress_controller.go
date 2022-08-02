@@ -3,12 +3,14 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/go-logr/logr"
 	netv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
+	"ngrok.io/ngrok-ingress-controller/pkg/agenttunneldriver"
+	"ngrok.io/ngrok-ingress-controller/pkg/ngrokapidriver"
+	"ngrok.io/ngrok-ingress-controller/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -32,8 +34,6 @@ type IngressReconciler struct {
 // logs and delete, update, edit ingress objects, you see the events come in.
 func (t *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := t.Log.WithValues("ingress", req.NamespacedName)
-	// TODO: Figure out the best way to form the edgeName taking into account isolating multiple clusters
-	edgeName := strings.Replace(req.NamespacedName.String(), "/", "-", -1)
 
 	// Fetch the ingress class. Later on, we'll filter based on this.
 	// I believe this client provided by the controller-runtime uses a cache
@@ -49,6 +49,10 @@ func (t *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if err := t.Get(ctx, req.NamespacedName, ingress); err != nil {
 		if client.IgnoreNotFound(err) == nil {
 			log.Info("ingress not found, must have been deleted")
+			// TODO: We can't construct a full edge object anymore now that the ingress
+			// object has been deleted. Unless we can infer every backend resource just based
+			// on the initial naming scheme derived from the namespaced name, we'll have to
+			// modify the ingress objects with a finalizer (see details in readme)
 			return ctrl.Result{}, nil
 		} else {
 
@@ -57,8 +61,15 @@ func (t *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	}
 
-	log.Info(fmt.Sprintf("We did find the ingress %+v \n", ingress))
-	log.Info(fmt.Sprintf("TODO: Create the api resources needed for this %s", edgeName))
+	log.Info(fmt.Sprintf("We did find the ingress. Lets ensure its created and up to date in the backend %+v \n", ingress))
+	edge := newEdge(ingress)
+	if err := agenttunneldriver.NewAgentTunnelDriver().EnsureTunnel(edge); err != nil {
+		return ctrl.Result{}, err
+	}
+	if err := ngrokapidriver.NewApiDriver().EnsureEdge(edge); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	return ctrl.Result{}, nil
 }
 
@@ -66,4 +77,36 @@ func (t *IngressReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&netv1.Ingress{}).
 		Complete(t)
+}
+
+func newEdge(ingress *netv1.Ingress) *types.Edge {
+	e := &types.Edge{
+		Description: "Some meaningful description to make sense in the dashboard",
+		MetaData: types.MetaData{
+			"is owned by ingress controller": "a name that should be determined elsewhere",
+			"some user provided":             "meta data for whatever they want",
+		},
+	}
+
+	for _, r := range ingress.Spec.Rules {
+		for _, p := range r.HTTP.Paths {
+			e.Routes = append(e.Routes, types.Route{
+				Path: p.Path,
+				TunnelBackend: types.TunnelBackend{
+					Hostname: p.Backend.Service.Name,
+					Port:     int(p.Backend.Service.Port.Number),
+				},
+			})
+		}
+
+		if r.Host != "" {
+			// modify edge to have a reserved domain
+		}
+	}
+
+	if ingress.ObjectMeta.Annotations["ngrok.ingress.kubernetes.io/https-compression"] == "true" {
+		// modify edge with https compression module
+	}
+
+	return e
 }
