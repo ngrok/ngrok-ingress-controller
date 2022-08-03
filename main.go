@@ -116,6 +116,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	mgr.Add(&controllers.IngressReconciler{})
+
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")

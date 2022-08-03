@@ -34,6 +34,7 @@ type IngressReconciler struct {
 // logs and delete, update, edit ingress objects, you see the events come in.
 func (t *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := t.Log.WithValues("ingress", req.NamespacedName)
+	ctx = logr.NewContext(ctx, log)
 
 	// Fetch the ingress class. Later on, we'll filter based on this.
 	// I believe this client provided by the controller-runtime uses a cache
@@ -63,7 +64,7 @@ func (t *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	log.Info(fmt.Sprintf("We did find the ingress. Lets ensure its created and up to date in the backend %+v \n", ingress))
 	edge := newEdge(ingress)
-	if err := agenttunneldriver.NewAgentTunnelDriver().EnsureTunnel(edge); err != nil {
+	if err := agenttunneldriver.NewAgentTunnelDriver(t.Client).EnsureTunnel(edge); err != nil {
 		return ctrl.Result{}, err
 	}
 	if err := ngrokapidriver.NewApiDriver().EnsureEdge(edge); err != nil {
@@ -74,9 +75,11 @@ func (t *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 }
 
 func (t *IngressReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+	c, _ := ctrl.NewControllerManagedBy(mgr).
 		For(&netv1.Ingress{}).
-		Complete(t)
+		Build(t)
+	mgr.Add(c)
+	return nil
 }
 
 func newEdge(ingress *netv1.Ingress) *types.Edge {
