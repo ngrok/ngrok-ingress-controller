@@ -190,6 +190,7 @@ func IngressToEdge(ctx context.Context, ingress *netv1.Ingress) (*ngrokapidriver
 			// TODO: Maybe I don't need this backend name. Need to figure out if edge labels have to all match or if we can match
 			// a subset. In theory the edge can support multiple different backends
 			"k8s.ngrok.com/k8s-backend-name": ingress.Spec.Rules[0].HTTP.Paths[0].Backend.Service.Name,
+			// TODO: Add port as a tunnel label so we distinguish between same backend but different ports
 		},
 		Routes: []ngrokapidriver.Route{
 			{

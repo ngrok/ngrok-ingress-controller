@@ -2,6 +2,8 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: minimal-ingress
+  annotations:
+    k8s.ngrok.com/compression: true
 spec:
   ingressClassName: ngrok
   rules:
@@ -13,6 +15,13 @@ spec:
         backend:
           service:
             name: nginx
+            port:
+              number: 80
+      - path: /stats
+        pathType: Prefix
+        backend:
+          service:
+            name: haproxy
             port:
               number: 80
 ---

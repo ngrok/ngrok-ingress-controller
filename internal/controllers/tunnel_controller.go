@@ -44,6 +44,7 @@ type TunnelReconciler struct {
 func (trec *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := trec.Log.WithValues("ingress", req.NamespacedName)
 	ctx = ctrl.LoggerInto(ctx, log)
+	// TODO: Needs to add in the path and other information to keep this prefixed.
 	tunnelName := strings.Replace(req.NamespacedName.String(), "/", "-", -1)
 	ingress, err := getIngress(ctx, trec.Client, req.NamespacedName)
 	if err != nil {

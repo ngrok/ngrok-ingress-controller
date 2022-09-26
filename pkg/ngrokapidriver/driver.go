@@ -8,6 +8,7 @@ import (
 	tgb "github.com/ngrok/ngrok-api-go/v4/backends/tunnel_group"
 	edge "github.com/ngrok/ngrok-api-go/v4/edges/https"
 	edge_route "github.com/ngrok/ngrok-api-go/v4/edges/https_routes"
+
 	"github.com/ngrok/ngrok-api-go/v4/reserved_domains"
 )
 
@@ -83,6 +84,8 @@ func (napi ngrokAPIDriver) CreateEdge(ctx context.Context, edgeSummary Edge) (*n
 		}
 	}
 
+	// TODO: the object should have labels tied to routes and loop over the routes to create
+	// a backend for each one, even if they are the same
 	backend, err := napi.tgbs.Create(ctx, &ngrok.TunnelGroupBackendCreate{
 		Labels:      edgeSummary.Labels,
 		Description: "Created by ngrok-ingress-controller",
@@ -92,20 +95,53 @@ func (napi ngrokAPIDriver) CreateEdge(ctx context.Context, edgeSummary Edge) (*n
 		return nil, err
 	}
 
+// loop through new edge routs
+// construct a key from each remote route
+// compare to our list
+	// for each one thats not in our list delete
+	// for each thats in our list but not remote, create it 
+	// if it is in our list, 
+
+	map["/+prefix+nginx"] = someInMemoryRoute
+	map["/stats+prefix+haproxy"] = someInMemoryRoute
+
+	// Loop through each route
+	// compare each of our annotations to the route settings (like compression)
+	// For each one if different, set it locally (do this for all annotations at the same time) and mark it diry
+	// Update each route that was changed locally via the api 
+
+
+	for _, r := range newEdge.Routes {
+		externalRouteKey = r.Path + r.Prefix + r.Service
+	}
+
+// UPDATE STUFF
 	for _, route := range edgeSummary.Routes {
-		_, err := napi.routes.Create(ctx, &ngrok.HTTPSEdgeRouteCreate{
+		key := route.Match + route.MatchType + edgeSummary.Labels["k8s.ngrok.com/k8s-backend-name"] // TODO: Add in the namespace and port
+		backendKey := edgeSummary.Labels["k8s.ngrok.com/k8s-backend-name"]  // TODO: Add in the namespace and port
+		
+
+
+		// CREATE STUFF
+		r, err := napi.routes.Create(ctx, &ngrok.HTTPSEdgeRouteCreate{
 			EdgeID:      newEdge.ID,
 			MatchType:   route.MatchType,
 			Match:       route.Match,
 			Description: "Created by ngrok-ingress-controller",
 			Metadata:    napi.metadata,
+			Compression: "on", // TODO: make this based on annotation
 			Backend: &ngrok.EndpointBackendMutate{
 				BackendID: backend.ID,
 			},
 		})
+
+		if r.Compression != edgeSummary.Annotations["k8s.ngrok.com/compression"] {
+			napi.Routes.Update
 		if err != nil {
 			return nil, err
 		}
+
+		napi.
 	}
 
 	return newEdge, nil
@@ -113,6 +149,13 @@ func (napi ngrokAPIDriver) CreateEdge(ctx context.Context, edgeSummary Edge) (*n
 
 // TODO: Implement this
 func (nc ngrokAPIDriver) UpdateEdge(ctx context.Context, edgeSummary Edge) (*ngrok.HTTPSEdge, error) {
+	// existinEdge := findEdge(edgeSummary.Id)
+	// if existingEdge.HostPorts != edgeSummary.HostPorts {
+	/// update the reserved domain stuff
+	// update the edge's hostports
+	// }
+	// Check if metadata is different and if so override it
+
 	return nil, nil
 }
 

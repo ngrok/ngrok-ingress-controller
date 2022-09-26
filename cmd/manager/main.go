@@ -97,6 +97,9 @@ func main() {
 		os.Exit(1)
 	}
 
+	ctrl.LoggerFrom(ctx).Info("setting up webhook server")
+	ctrl.LoggerInto
+
 	if err := (&controllers.IngressReconciler{
 		Client:         mgr.GetClient(),
 		Log:            ctrl.Log.WithName("controllers").WithName("ingress"),
