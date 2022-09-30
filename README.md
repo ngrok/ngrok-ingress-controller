@@ -2,21 +2,6 @@
 
 This is a general purpose [kubernetes ingress controller](https://kubernetes.io/docs/concepts/services-networking/ingress-controllers/) that uses ngrok.
 
-
-TOOD:
-* Generate a unique name for the controller installation.
-* ci to run make commands and then diff at end to make sure anything generated and checked in is all good
-* perhaps use https://book.kubebuilder.io/component-config-tutorial/tutorial.html instead of a normal config map for agent configs
-* helm lint
-* setup filters https://stuartleeks.com/posts/kubebuilder-event-filters-part-1-delete/
-* handle multiple namespaces
-  * flexing what namespace the controller is installed in
-* handle ingress with multiple rules and hosts
-* make the health/ready checks run the `ngrok diagnose` command or ping the container tunnels endpoint to make sure its healthy
-* user can supply their own metadata
-* setup unit tests for go
-* make it work with a free account
-
 ## Prerequisites
 
 * [Go 1.19](https://go.dev/dl/)
@@ -86,3 +71,24 @@ Then, you need to update the `value` field in that new file.
 
 You can then apply the given example via `kubectl apply -k examples/<example in question>`, i.e.
 `kubectl apply -k examples/hello-world-ingess`.
+
+
+
+
+
+======================================================================================================================================================
+## TODO
+The core issues are in github. Here are some random other more future issues to follow up with at the end.
+
+Up Next:
+* Users configure their own metadata
+* automated tests (unit tests for go, integration tests for k8s)
+
+Resiliency:
+* Test failover situations during ingress update and controller updates
+
+Future Nice To Haves:
+* ci to run make commands and then diff at end to make sure anything generated and checked in is all good
+* refactor to use https://book.kubebuilder.io/component-config-tutorial/tutorial.html instead of a normal config map for agent configs
+* add helm lint to ci
+* refactor some of the controllers logic into predicate filters https://stuartleeks.com/posts/kubebuilder-event-filters-part-1-delete/
