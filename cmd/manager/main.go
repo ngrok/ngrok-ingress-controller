@@ -19,19 +19,16 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
-	v1 "k8s.io/api/core/v1"
+
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/ngrok/ngrok-ingress-controller/internal/controllers"
 	"github.com/ngrok/ngrok-ingress-controller/pkg/ngrokapidriver"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -117,17 +114,6 @@ func main() {
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "tunnel")
 		os.Exit(1)
-	}
-
-	// Can query for config maps like this.
-	// For controller level configs, this may be the recommended way though https://book.kubebuilder.io/reference/markers.html
-	// We can't use this though to write config maps, and the mgr.GetClient() doesn't work because the cache isn't initialized
-	config := &v1.ConfigMap{}
-	if err := mgr.GetAPIReader().Get(ctx, types.NamespacedName{Name: configMapName, Namespace: namespace}, config); client.IgnoreNotFound(err) != nil {
-		setupLog.Error(err, fmt.Sprintf("error getting config map named '%s'", configMapName))
-		os.Exit(1)
-	} else {
-		setupLog.Info(fmt.Sprintf("Found config map named '%s' %+v", configMapName, config))
 	}
 
 	//+kubebuilder:scaffold:builder
