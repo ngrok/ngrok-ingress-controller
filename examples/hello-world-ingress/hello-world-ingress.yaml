@@ -15,6 +15,13 @@ spec:
             name: http-echo-svc
             port:
               number: 80
+      - path: /bezek
+        pathType: Prefix
+        backend:
+          service:
+            name: http-echo-svc
+            port:
+              number: 80
 ---
 apiVersion: apps/v1
 kind: Deployment

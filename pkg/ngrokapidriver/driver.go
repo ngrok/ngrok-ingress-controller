@@ -177,7 +177,78 @@ func (nc ngrokAPIDriver) UpdateEdge(ctx context.Context, edgeSummary *Edge) (*ng
 	// for each thats in our list but not remote, create it
 	// if it is in our list, then all its attributes match so ignore it
 	// TODO: also check for route modules at this point
+
+	log := ctrl.LoggerFrom(ctx).WithValues("Update Edge Routes", edgeSummary.Id)
+	desiredRoutes := make(map[string]*Route)
+	currRoutesBknd := make(map[string]*routeBackend)
+	for _, route := range edgeSummary.Routes {
+		desiredRoutes[route.GetHash()] = &route
+		log.Info("Adding desired route to map", "route", route.GetHash())
+	}
+
+	for _, route := range existingEdge.Routes {
+		// Get the backend for the route using the backend id
+		backend, err := nc.tgbs.Get(ctx, route.Backend.Backend.ID)
+		if err != nil {
+			return nil, err
+		}
+		rb := &routeBackend{
+			route:   &route,
+			backend: backend,
+		}
+		currRoutesBknd[edgeToHash(&route, backend)] = rb
+		log.Info("Adding current route to map", "route", edgeToHash(&route, backend))
+	}
+
+	for _, route := range currRoutesBknd {
+		// If the route is not in our desired routes, delete it
+		if _, ok := desiredRoutes[edgeToHash(route.route, route.backend)]; !ok {
+			log.Info("Deleting route", "route", edgeToHash(route.route, route.backend))
+			err := nc.routes.Delete(ctx, &ngrok.EdgeRouteItem{EdgeID: existingEdge.ID, ID: route.route.ID})
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	for _, route := range desiredRoutes {
+		// If the route is not in our current routes, create it
+		if _, ok := currRoutesBknd[route.GetHash()]; !ok {
+			log.Info("Creating route", "route", route.GetHash())
+			// Create Tunnel-Group Backend
+			backend, err := nc.tgbs.Create(ctx, &ngrok.TunnelGroupBackendCreate{
+				Labels:      route.Labels,
+				Description: "Created by ngrok-ingress-controller",
+				Metadata:    nc.metadata,
+			})
+			if err != nil {
+				return nil, err
+			}
+			// Create Route
+			edgeRouteCreate := ngrok.HTTPSEdgeRouteCreate{
+				EdgeID:      existingEdge.ID,
+				MatchType:   route.MatchType,
+				Match:       route.Match,
+				Description: "Created by ngrok-ingress-controller",
+
+				Metadata: nc.metadata,
+				Backend: &ngrok.EndpointBackendMutate{
+					BackendID: backend.ID,
+				},
+			}
+			// create the route
+			_, err = nc.routes.Create(ctx, &edgeRouteCreate)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	return existingEdge, nil
+}
+
+func edgeToHash(route *ngrok.HTTPSEdgeRoute, backend *ngrok.TunnelGroupBackend) string {
+	return fmt.Sprintf("%s-%s-%s-%s", route.MatchType, route.Match, backend.Labels["k8s.ngrok.com/service"], backend.Labels["k8s.ngrok.com/port"])
 }
 
 // DeleteEdge deletes the edge and routes but doesn't delete reserved domains
