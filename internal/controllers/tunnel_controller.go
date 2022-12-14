@@ -13,10 +13,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 const (
@@ -84,48 +81,25 @@ func (trec *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	return ctrl.Result{}, nil
 }
 
-// Create a new Controller that watches Ingress objects.
-// Add it to our manager.
 func (trec *TunnelReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	tCont, err := NewTunnelControllerNew("tunnel-controller", mgr, trec)
-	if err != nil {
-		return err
-	}
-
-	if err := tCont.Watch(&source.Kind{Type: &netv1.Ingress{}}, &handler.EnqueueRequestForObject{}); err != nil {
-		return err
-	}
-
-	mgr.Add(tCont)
-	return nil
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&netv1.Ingress{}).
+		Complete(trec)
 }
 
-// Small wrapper struct of the core controller.Controller so we get most of its functionality
-type TunnelController struct {
-	controller.Controller
-}
+// Check if our TunnelReconciler implements necessary interfaces.
+// var _ manager.Runnable = &TunnelReconciler{}
+var _ manager.LeaderElectionRunnable = &TunnelReconciler{}
 
-// Creates an un-managed controller that can be embeded in our controller struct so we can override functions.
-func NewTunnelControllerNew(name string, mgr manager.Manager, trec *TunnelReconciler) (controller.Controller, error) {
-	cont, err := controller.NewUnmanaged(name, mgr, controller.Options{
-		Reconciler: trec,
-	})
-	if err != nil {
-		return nil, err
-	}
-	return &TunnelController{
-		Controller: cont,
-	}, nil
-}
-
-// This controller should not use leader election. It should run on all controllers by default to control the agents on each.
-func (trec *TunnelController) NeedLeaderElection() bool {
+// NeedLeaderElection implements the LeaderElectionRunnable interface,
+// controllers need to be run in leader election mode.
+func (r *TunnelReconciler) NeedLeaderElection() bool {
 	return false
 }
 
-func (trec *TunnelController) Start(ctx context.Context) error {
-	return trec.Controller.Start(ctx)
-}
+// func (trec *TunnelReconciler) Start(ctx context.Context) error {
+// 	return trec.Run(ctx, 1)
+// }
 
 // Converts a k8s Ingress Rule to and ngrok Agent Tunnel configuration.
 func tunnelsPlanner(rule netv1.IngressRuleValue, ingressName, namespace string) []agentapiclient.TunnelsAPIBody {
